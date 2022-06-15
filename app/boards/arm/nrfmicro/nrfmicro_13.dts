@@ -128,26 +128,27 @@
     miso-pin = <3>;
     cs-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
 
-    trackpad: trackpad@0 {
-        compatible = "cirque,pinnacle";
+    // trackpad: trackpad@0 {
+    //     compatible = "cirque,pinnacle";
+    //     // status = "okay";
+    //     reg = <0>;
+    //     label = "cirque trackpad";
+    //     spi-max-frequency = <10000000>;
+    //     dr-gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+    //     invert-x;
+    //     sleep;
+    //     /* no-taps; */
+    // };
+
+    trackball: trackball@0 {
+        compatible = "pixart,pmw33xx";
         // status = "okay";
         reg = <0>;
-        label = "Cirque Trackpad";
+        label = "Pixart PMW3360";
+        cs-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
+        motswk-gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
         spi-max-frequency = <10000000>;
-        dr-gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-        invert-x;
-        sleep;
-        /* no-taps; */
     };
-
-    // trackball@0 {
-    //     compatible = "pixart,pmw33xx";
-    //     status = "okay";
-    //     reg = <0>;
-    //     cs-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
-    //     label = "3360";
-    //     spi-max-frequency = <10000000>;
-    // };
 };
 
 nrfmicro_spi: &spi0 {};

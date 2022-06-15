@@ -8,18 +8,17 @@
 
 #define SCROLL_DIV_FACTOR 5
 
-const struct device *trackpad = DEVICE_DT_GET(DT_INST(0, pixart_pmw33xx));
+const struct device *trackball = DEVICE_DT_GET(DT_INST(0, pixart_pmw33xx));
 
-LOG_MODULE_REGISTER(trackpad, CONFIG_SENSOR_LOG_LEVEL);
+LOG_MODULE_REGISTER(trackball, CONFIG_SENSOR_LOG_LEVEL);
 
-static void handle_trackpad(const struct device *dev, const struct sensor_trigger *trig) {
-    static uint8_t last_pressed = 0;
+static void handle_trackball(const struct device *dev, const struct sensor_trigger *trig) {
     int ret = sensor_sample_fetch(dev);
     if (ret < 0) {
         LOG_ERR("fetch: %d", ret);
         return;
     }
-    struct sensor_value dx, dy, btn;
+    struct sensor_value dx, dy;
     ret = sensor_channel_get(dev, SENSOR_CHAN_POS_DX, &dx);
     if (ret < 0) {
         LOG_ERR("get dx: %d", ret);
@@ -30,49 +29,33 @@ static void handle_trackpad(const struct device *dev, const struct sensor_trigge
         LOG_ERR("get dy: %d", ret);
         return;
     }
-    ret = sensor_channel_get(dev, SENSOR_CHAN_PRESS, &btn);
-    if (ret < 0) {
-        LOG_ERR("get btn: %d", ret);
-        return;
-    }
-    LOG_DBG("trackpad %d %d %02x", dx.val1, dy.val1, btn.val1);
+    LOG_DBG("trackball %d %d", dx.val1, dy.val1);
     zmk_hid_mouse_movement_set(0, 0);
     zmk_hid_mouse_scroll_set(0, 0);
     const uint8_t layer = zmk_keymap_highest_layer_active();
-    uint8_t button;
-    static uint8_t last_button = 0;
     static int8_t scroll_ver_rem = 0, scroll_hor_rem = 0;
     if (layer == 2) {   // lower
         const int16_t total_hor = dx.val1 + scroll_hor_rem, total_ver = -(dy.val1 + scroll_ver_rem);
         scroll_hor_rem = total_hor % SCROLL_DIV_FACTOR;
         scroll_ver_rem = total_ver % SCROLL_DIV_FACTOR;
         zmk_hid_mouse_scroll_update(total_hor / SCROLL_DIV_FACTOR, total_ver / SCROLL_DIV_FACTOR);
-        button = RCLK;
     } else {
         zmk_hid_mouse_movement_update(CLAMP(dx.val1, INT8_MIN, INT8_MAX), CLAMP(dy.val1, INT8_MIN, INT8_MAX));
-        button = LCLK;
-    }
-    if (!last_pressed && btn.val1) {
-        zmk_hid_mouse_buttons_press(button);
-        last_button = button;
-    } else if (last_pressed && !btn.val1) {
-        zmk_hid_mouse_buttons_release(last_button);
     }
     zmk_endpoints_send_mouse_report();
-    last_pressed = btn.val1;
 }
 
-static int trackpad_init() {
+static int trackball_init() {
     struct sensor_trigger trigger = {
         .type = SENSOR_TRIG_DATA_READY,
         .chan = SENSOR_CHAN_ALL,
     };
-    printk("trackpad");
-    if (sensor_trigger_set(trackpad, &trigger, handle_trackpad) < 0) {
+    printk("trackball");
+    if (sensor_trigger_set(trackball, &trigger, handle_trackball) < 0) {
         LOG_ERR("can't set trigger");
         return -EIO;
     };
     return 0;
 }
 
-SYS_INIT(trackpad_init, APPLICATION, CONFIG_ZMK_KSCAN_INIT_PRIORITY);
+SYS_INIT(trackball_init, APPLICATION, CONFIG_ZMK_KSCAN_INIT_PRIORITY);
