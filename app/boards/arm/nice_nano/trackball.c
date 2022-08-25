@@ -5,6 +5,7 @@
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
 #include <dt-bindings/zmk/mouse.h>
+#include <sys/atomic.h>
 
 #define SCROLL_DIV_FACTOR 5
 
@@ -12,15 +13,19 @@ const struct device *trackball = DEVICE_DT_GET(DT_INST(0, pixart_pmw33xx));
 
 LOG_MODULE_REGISTER(trackball, CONFIG_SENSOR_LOG_LEVEL);
 
+ATOMIC_DEFINE(timer_set_bit, 1);
+
 void deactivate_mouse_layer(struct k_timer *timer) {
     zmk_keymap_layer_deactivate(CONFIG_MOUSE_LAYER_INDEX);
+    atomic_clear_bit(timer_set_bit, 1);
 }
 K_TIMER_DEFINE(mouse_layer_timer, deactivate_mouse_layer, NULL);
 
 static void handle_trackball(const struct device *dev, const struct sensor_trigger *trig) {
-    k_timer_stop(&mouse_layer_timer);
-    zmk_keymap_layer_activate(CONFIG_MOUSE_LAYER_INDEX);
-    k_timer_start(&mouse_layer_timer, K_MSEC(CONFIG_MOUSE_LAYER_ACTIVE_MS), K_NO_WAIT);
+    if (!atomic_test_and_set_bit(timer_set_bit, 1)) {
+        zmk_keymap_layer_activate(CONFIG_MOUSE_LAYER_INDEX);
+        k_timer_start(&mouse_layer_timer, K_MSEC(CONFIG_MOUSE_LAYER_ACTIVE_MS), K_NO_WAIT);
+    }
 
     int ret = sensor_sample_fetch(dev);
     if (ret < 0) {
@@ -39,6 +44,7 @@ static void handle_trackball(const struct device *dev, const struct sensor_trigg
         return;
     }
     LOG_DBG("trackball %d %d", dx.val1, dy.val1);
+    dy.val1 = -dy.val1;
     zmk_hid_mouse_movement_set(0, 0);
     zmk_hid_mouse_scroll_set(0, 0);
     static int8_t scroll_ver_rem = 0, scroll_hor_rem = 0;
