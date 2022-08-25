@@ -286,7 +286,7 @@ static int pmw33xx_init_chip(const struct device *dev) {
         return -EIO;
     }
     if (pid != PMW33XX_PID) {
-        LOG_ERR("pid does not match expected: got (%x), expected(%x)", pid, PMW33XX_PID);
+        LOG_ERR("pid does not match expected: got (%x), expected(%x).", pid, PMW33XX_PID);
         return -EIO;
     }
     pmw33xx_write_reg(dev, PMW33XX_REG_CONFIG2,
