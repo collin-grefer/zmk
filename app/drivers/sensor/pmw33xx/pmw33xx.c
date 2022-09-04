@@ -24,6 +24,7 @@
 #include "pmw33xx.h"
 
 LOG_MODULE_REGISTER(PMW33XX, CONFIG_SENSOR_LOG_LEVEL);
+
 #define PMW33XX_PID COND_CODE_1(CONFIG_PMW33XX_3389, (PMW33XX_3389_PID), (PMW33XX_3360_PID))
 #define PMW33XX_CPI_MAX                                                                            \
     COND_CODE_1(CONFIG_PMW33XX_3389, (PMW33XX_3389_CPI_MAX), (PMW33XX_3360_CPI_MAX))
@@ -74,7 +75,8 @@ static int pmw33xx_access(const struct device *dev, const uint8_t reg, uint8_t *
     pmw33xx_cs_select(cs_gpio_cfg, 0);
 
     int err = spi_write(data->bus, spi_cfg, &tx);
-    k_sleep(K_USEC(120)); // Tsrad
+    /* k_sleep(K_USEC(120)); // Tsrad */
+    k_busy_wait(180); // Tsrad
     if (err) {
         pmw33xx_cs_select(cs_gpio_cfg, 1);
         return err;
@@ -85,7 +87,8 @@ static int pmw33xx_access(const struct device *dev, const uint8_t reg, uint8_t *
     else
         err = spi_read(data->bus, spi_cfg, &rx);
     pmw33xx_cs_select(cs_gpio_cfg, 1);
-    k_sleep(K_USEC(160));
+    /* k_sleep(K_USEC(160)); */
+    k_busy_wait(180);
     if ((reg & PMW33XX_WR_MASK) == 0 && value != NULL)
         *value = result[0];
     return err;
@@ -113,15 +116,23 @@ static int pmw33xx_write_srom(const struct device *dev) {
         .count = 1,
     };
 
+    // 1. disable rest
+    pmw33xx_write_reg(dev, PMW33XX_REG_CONFIG2, 0x00);
+
+    // 2. downlaod init cmd
     pmw33xx_write_reg(dev, PMW33XX_REG_SROM_EN, PMW33XX_SROM_DWNLD_CMD);
-    k_sleep(K_USEC(15));
+
+    k_busy_wait(15);
+
+    // 3. download start cmd
     pmw33xx_write_reg(dev, PMW33XX_REG_SROM_EN, PMW33XX_SROM_DWNLD_START_CMD);
 
+    // 4. transmit the srom firmware
     pmw33xx_cs_select(cs_gpio_cfg, 0);
 
     int err = spi_write(data->bus, spi_cfg, &tx);
 
-    k_sleep(K_USEC(15));
+    k_busy_wait(15);
     if (err) {
         pmw33xx_cs_select(cs_gpio_cfg, 1);
         return err;
@@ -130,7 +141,7 @@ static int pmw33xx_write_srom(const struct device *dev) {
     for (uint16_t i = 0; i < sizeof(SROM); i++) {
         access[0] = SROM[i];
         err = spi_write(data->bus, spi_cfg, &tx);
-        k_sleep(K_USEC(15));
+        k_busy_wait(15);
         if (err) {
             pmw33xx_cs_select(cs_gpio_cfg, 1);
             return err;
@@ -138,7 +149,9 @@ static int pmw33xx_write_srom(const struct device *dev) {
     }
 
     pmw33xx_cs_select(cs_gpio_cfg, 1);
-    k_sleep(K_MSEC(2)); // Tbexit
+
+    // 5. finish and exit
+    k_busy_wait(2000); // Tbexit
     return err;
 }
 
@@ -169,16 +182,18 @@ static int pmw33xx_read_motion_burst(const struct device *dev, struct pmw33xx_mo
     pmw33xx_cs_select(cs_gpio_cfg, 0);
 
     int err = spi_write(data->bus, spi_cfg, &tx);
-    k_sleep(K_USEC(35)); // tsrad motbr
     if (err) {
         pmw33xx_cs_select(cs_gpio_cfg, 1);
         return err;
     }
+
+    // wait needed
+    k_busy_wait(35); // tsrad motbr
+
+    // start reading continuosly
     err = spi_read(data->bus, spi_cfg, &rx);
     pmw33xx_cs_select(cs_gpio_cfg, 1);
-#ifdef CONFIG_PMW33XX_TRIGGER
-    pmw33xx_reset_motion(dev);
-#endif
+
     return err;
 }
 
@@ -186,6 +201,32 @@ static int pmw33xx_read_motion_burst(const struct device *dev, struct pmw33xx_mo
 void pmw33xx_reset_motion(const struct device *dev) {
     // reset motswk interrupt
     pmw33xx_read_reg(dev, PMW33XX_REG_MOTION, NULL);
+}
+#endif
+
+#if IS_ENABLED(CONFIG_SENSOR_LOG_LEVEL_DBG)
+void pmw33xx_print_registers(const struct device *dev) {
+  LOG_DBG("print important regiter values of pmw33xx:");
+
+  uint8_t val;
+  int err;
+
+  // pid, rid
+  err = pmw33xx_read_reg(dev, PMW33XX_REG_PID, &val);
+  if (err) {
+    LOG_ERR("couldn't read register 0x%x", PMW33XX_REG_PID);
+  }
+  else {
+    LOG_DBG("pmw33xx pid: 0x%x", val);
+  }
+
+  err = pmw33xx_read_reg(dev, PMW33XX_REG_REV_ID, &val);
+  if (err) {
+    LOG_ERR("couldn't read register 0x%x", PMW33XX_REG_REV_ID);
+  }
+  else {
+    LOG_DBG("pmw33xx vid: 0x%x", val);
+  }
 }
 #endif
 
@@ -271,32 +312,33 @@ static int pmw33xx_set_cpi(const struct device *dev, uint16_t cpi) {
 static int pmw33xx_init_chip(const struct device *dev) {
     const struct pmw33xx_config *const config = dev->config;
     const struct pmw33xx_gpio_dt_spec *cs_gpio_cfg = &config->bus_cfg.spi_cfg->cs_spec;
+
+    // reset spi port
     pmw33xx_cs_select(cs_gpio_cfg, 1);
+    pmw33xx_cs_select(cs_gpio_cfg, 0);
     k_sleep(K_MSEC(1));
 
+    // power reset
     int err = pmw33xx_write_reg(dev, PMW33XX_REG_PWR_UP_RST, PMW33XX_RESET_CMD);
     if (err) {
         LOG_ERR("could not reset %d", err);
         return -EIO;
     }
-    uint8_t pid = 0x0;
-    err = pmw33xx_read_reg(dev, PMW33XX_REG_PID, &pid);
-    if (err) {
-        LOG_ERR("could not reset %d", err);
-        return -EIO;
-    }
-    if (pid != PMW33XX_PID) {
-        LOG_ERR("pid does not match expected: got (%x), expected(%x).", pid, PMW33XX_PID);
-        return -EIO;
-    }
-    pmw33xx_write_reg(dev, PMW33XX_REG_CONFIG2,
-                      config->disable_rest ? 0x00 : PMW33XX_RESTEN); // set rest enable
+    k_sleep(K_MSEC(50));
 
+    // clear motion data (by reading motion registers from 0x02 to 0x06)
+    // use burst read or normal read
+    struct pmw33xx_motion_burst val;
+    pmw33xx_read_motion_burst(dev, &val); // read and throwout initial motion data
+
+    // update fireware
     err = pmw33xx_write_srom(dev);
     if (err) {
         LOG_ERR("could not upload srom %d", err);
         return -EIO;
     }
+
+    // confirm srom running status
     uint8_t srom_run = 0x0;
     err = pmw33xx_read_reg(dev, PMW33XX_REG_OBSERVATION, &srom_run);
     if (err) {
@@ -308,23 +350,47 @@ static int pmw33xx_init_chip(const struct device *dev) {
         return -EIO;
     }
 
+    // confirm firmware update by reading srom version, todo: comparison needed
     uint8_t srom_id = 0x0;
     err = pmw33xx_read_reg(dev, PMW33XX_REG_SROM_ID, &srom_id);
     if (err) {
         LOG_ERR("could not check srom id %d", err);
         return -EIO;
     }
-    if (!srom_id) {
+    LOG_INF("pmw33xx SROM firmware id: %d", srom_id);
+    if (srom_id != PMW3360_FIRMWARE_ID) {
         LOG_ERR("srom id invalid %d", srom_id);
         return -EIO;
     }
 
-    pmw33xx_write_reg(dev, PMW33XX_REG_BURST, 0x01);
-    struct pmw33xx_motion_burst val;
-    pmw33xx_read_motion_burst(dev, &val); // read and throwout initial motion data
+    // confirm pid
+    uint8_t pid = 0x0;
+    err = pmw33xx_read_reg(dev, PMW33XX_REG_PID, &pid);
+    if (err) {
+        LOG_ERR("could not reset %d", err);
+        return -EIO;
+    }
+    if (pid != PMW33XX_PID) {
+        LOG_ERR("pid does not match expected: got (%x), expected(%x)", pid, PMW33XX_PID);
+        return -EIO;
+    }
 
+    // enable rest
+    pmw33xx_write_reg(dev, PMW33XX_REG_CONFIG2,
+                      config->disable_rest ? 0x00 : PMW33XX_RESTEN); // set rest enable
+
+#if IS_ENABLED(CONFIG_SENSOR_LOG_LEVEL_DBG)
+    pmw33xx_print_registers(dev);
+#endif
+
+    // enbale motion burst by writing something into motion_burst register, only needed once
+    // WARNING: no regiter reading other than position regiters after this setup
+    pmw33xx_write_reg(dev, PMW33XX_REG_BURST, 0x01);
+
+    // set cpi
     if (config->cpi > PMW33XX_CPI_MIN && config->cpi < PMW33XX_CPI_MAX)
         return pmw33xx_set_cpi(dev, config->cpi);
+
     return 0;
 }
 
@@ -345,6 +411,7 @@ static int pmw33xx_init(const struct device *dev) {
         return -EIO;
     }
 
+
 #ifdef CONFIG_PMW33XX_TRIGGER
     if (pmw33xx_init_interrupt(dev) < 0) {
         LOG_DBG("Failed to initialize interrupt!");
@@ -356,7 +423,9 @@ static int pmw33xx_init(const struct device *dev) {
 }
 
 #define PMW33XX_DATA_SPI(n)                                                                        \
-    { .cs_ctrl = {}, }
+    {                                                                                              \
+      .cs_ctrl = {},                                                    \
+.resume_interrupt = false,}
 
 #define PMW33XX_SPI_CFG(n)                                                                         \
     (&(struct pmw33xx_spi_cfg){                                                                    \
@@ -364,7 +433,7 @@ static int pmw33xx_init(const struct device *dev) {
             {                                                                                      \
                 .frequency = DT_INST_PROP(n, spi_max_frequency),                                   \
                 .operation =                                                                       \
-                    (SPI_WORD_SET(8) | SPI_OP_MODE_MASTER | SPI_MODE_CPOL | SPI_MODE_CPHA),        \
+                (SPI_WORD_SET(8) | SPI_TRANSFER_MSB | SPI_OP_MODE_MASTER | SPI_MODE_CPOL | SPI_MODE_CPHA), \
                 .slave = DT_INST_REG_ADDR(n),                                                      \
             },                                                                                     \
         .cs_spec = PMW33XX_GPIO_DT_SPEC_GET_BY_IDX(DT_DRV_INST(n), cs_gpios, 0),                   \
@@ -382,7 +451,7 @@ static int pmw33xx_init(const struct device *dev) {
         .bus_name = DT_INST_BUS_LABEL(n), .bus_init = pmw33xx_spi_init,                            \
         .bus_cfg = {.spi_cfg = PMW33XX_SPI_CFG(n)},                                                \
         .disable_rest = DT_INST_NODE_HAS_PROP(n, disable_rest),                                    \
-        COND_CODE_0(DT_INST_NODE_HAS_PROP(n, cpi), (0), (DT_INST_PROP(n, cpi)))                    \
+        .cpi = COND_CODE_0(DT_INST_NODE_HAS_PROP(n, cpi), (0), (DT_INST_PROP(n, cpi)))                    \
             COND_CODE_1(CONFIG_PMW33XX_TRIGGER,                                                    \
                         (, PMW33XX_GPIO_DT_SPEC_GET_BY_IDX(DT_DRV_INST(n), motswk_gpios, 0)), ())  \
     }

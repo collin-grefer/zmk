@@ -12,11 +12,15 @@
 #include <sys/util.h>
 #include <drivers/spi.h>
 
+/* wr/rd mask */
 #define PMW33XX_WR_MASK 0x80
 #define PMW33XX_RD_MASK 0x7F
 
+/* default values */
 #define PMW33XX_3389_PID 0x47
 #define PMW33XX_3360_PID 0x42
+
+// todo: different rev id for different sensor
 #define PMW33XX_REV 0x01
 
 /* General Registers */
@@ -30,7 +34,6 @@
 #define PMW33XX_REG_DX_H 0x04
 #define PMW33XX_REG_DY_L 0x05
 #define PMW33XX_REG_DY_H 0x06
-#define PMW33XX_REG_BURST 0x50
 
 /* Motion bits */
 #define PMW33XX_MOTION (1 << 8)
@@ -39,15 +42,17 @@
 #define PMW33XX_OPMODE_REST2 (0b10 << 1)
 #define PMW33XX_OPMODE_REST3 (0b11 << 1)
 
+// todo: 
+#define PMW33XX_REG_BURST 0x50
 /* SROM Registers */
 #define PMW33XX_REG_SROM_EN 0x13
 #define PMW33XX_REG_SROM_ID 0x2A
 #define PMW33XX_REG_SROM_BURST 0x62
 
 /* SROM CMDs */
-#define PMW33XX_SROM_CRC_CMD 0x15
-#define PMW33XX_SROM_DWNLD_CMD 0x1D
-#define PMW33XX_SROM_DWNLD_START_CMD 0x18
+#define PMW33XX_SROM_CRC_CMD 0x15 // self-test
+#define PMW33XX_SROM_DWNLD_CMD 0x1D // init downlaod
+#define PMW33XX_SROM_DWNLD_START_CMD 0x18 // start download
 
 /* CPI Registers */
 #define PMW33XX_3360_REG_CPI 0x0F
@@ -114,6 +119,8 @@ struct pmw33xx_data {
 
     int16_t dx;
     int16_t dy;
+
+  bool resume_interrupt;
 
     const struct pmw33xx_transfer_function *hw_tf;
 
