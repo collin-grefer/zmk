@@ -8,8 +8,8 @@
 
 #define SCROLL_DIV_FACTOR 10
 #define MOUSE_MOVE_FACTOR 2
-//#define ACCEL_EXPONENT 2
 //#define INERTIAL_CURSOR
+//#define FRICTION_COEFF 2
 
 LOG_MODULE_REGISTER(trackpad, CONFIG_SENSOR_LOG_LEVEL);
 
@@ -46,6 +46,7 @@ static void handle_trackpad(const struct device *dev, const struct sensor_trigge
     static uint8_t last_button = 0;
     static int8_t scroll_ver_rem = 0, scroll_hor_rem = 0;
     static int8_t dx_scaled = 0, dy_scaled = 0;
+    static int8_t decel_counter = 0;
     if (layer == 1) {   // raise
         const int16_t total_hor = dx.val1 + scroll_hor_rem, total_ver = -dy.val1 + scroll_ver_rem;
         scroll_hor_rem = total_hor % SCROLL_DIV_FACTOR;
@@ -54,8 +55,8 @@ static void handle_trackpad(const struct device *dev, const struct sensor_trigge
         button = MCLK;
     } else {
         //zmk_hid_mouse_movement_update(CLAMP(-dx.val1, INT8_MIN, INT8_MAX), CLAMP(dy.val1, INT8_MIN, INT8_MAX));
-        dx_scaled = -dx.val1 * MOUSE_MOVE_FACTOR;
-        dy_scaled = dy.val1 * MOUSE_MOVE_FACTOR;
+        dx_scaled = dx.val1 * MOUSE_MOVE_FACTOR;
+        dy_scaled = -dy.val1 * MOUSE_MOVE_FACTOR;
         zmk_hid_mouse_movement_update(CLAMP(dx_scaled, INT8_MIN, INT8_MAX), CLAMP(dy_scaled, INT8_MIN, INT8_MAX));
         button = LCLK;
     }
