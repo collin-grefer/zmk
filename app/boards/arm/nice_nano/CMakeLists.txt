@@ -4,7 +4,6 @@ if(CONFIG_ZMK_DISPLAY AND CONFIG_ZMK_DISPLAY_STATUS_SCREEN_CUSTOM)
   # add_subdirectory_ifdef(CONFIG_NRFMACRO_OLED_DISPLAY oled_screen)
 endif()
 
-
 add_subdirectory_ifdef(CONFIG_PINNACLE trackpad)
 add_subdirectory_ifdef(CONFIG_PMW33XX trackball)
 add_subdirectory_ifdef(CONFIG_PMW3360 trackball)
