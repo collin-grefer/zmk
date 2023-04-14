@@ -111,7 +111,7 @@ static void pinnacle_int_cb(const struct device *dev) {
     data->data_ready_handler(dev, data->data_ready_trigger);
 
     // clear hardware interrupt on trackpad side
-    pinnacle_write(dev, PINNACLE_STATUS1, 0);
+    // pinnacle_write(dev, PINNACLE_STATUS1, 0);
 
     // enable the inerrupt to the host side
     set_int(dev, true);
@@ -139,7 +139,7 @@ static void pinnacle_gpio_cb(const struct device *port, struct gpio_callback *cb
     const struct device *dev = data->dev;
     set_int(dev, false); // disable interrupt on mcu side
 
-    /* pinnacle_write(dev, PINNACLE_STATUS1, 0);   // clear hardware interrupt on trackpad side */
+    pinnacle_write(dev, PINNACLE_STATUS1, 0);   // clear hardware interrupt on trackpad side */
 
     // dispatch data handling to work thead
 #if defined(CONFIG_PINNACLE_TRIGGER_OWN_THREAD)
@@ -147,6 +147,7 @@ static void pinnacle_gpio_cb(const struct device *port, struct gpio_callback *cb
 #elif defined(CONFIG_PINNACLE_TRIGGER_GLOBAL_THREAD)
     k_work_submit(&data->work);
 #endif
+    set_int(dev, false);
 }
 #endif
 
@@ -230,8 +231,7 @@ static const struct pinnacle_config pinnacle_config = {
         .cs = &pinnacle_config.spi_cs,
         .frequency = DT_INST_PROP(0, spi_max_frequency),
         .slave = DT_INST_REG_ADDR(0),
-        /* .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB), */
-        .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB | SPI_MODE_CPHA),
+        .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_LINES_SINGLE | SPI_TRANSFER_MSB), // | SPI_MODE_CPHA),
     },
     .invert_x = DT_INST_PROP(0, invert_x),
     .invert_y = DT_INST_PROP(0, invert_y),
