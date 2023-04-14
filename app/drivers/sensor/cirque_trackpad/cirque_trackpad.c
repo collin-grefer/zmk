@@ -87,7 +87,6 @@ static int pinnacle_sample_fetch(const struct device *dev, enum sensor_channel c
 static void set_int(const struct device *dev, const bool en) {
     const struct pinnacle_config *config = dev->config;
     int ret = gpio_pin_interrupt_configure(config->dr_port, config->dr_pin, en ? GPIO_INT_LEVEL_ACTIVE : GPIO_INT_DISABLE);
-    /* int ret = gpio_pin_interrupt_configure(config->dr_port, config->dr_pin, en ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE); */
     if (ret < 0) {
         LOG_ERR("can't set interrupt");
     }
@@ -109,11 +108,6 @@ static int pinnacle_trigger_set(const struct device *dev, const struct sensor_tr
 static void pinnacle_int_cb(const struct device *dev) {
     struct pinnacle_data *data = dev->data;
     data->data_ready_handler(dev, data->data_ready_trigger);
-
-    // clear hardware interrupt on trackpad side
-    // pinnacle_write(dev, PINNACLE_STATUS1, 0);
-
-    // enable the inerrupt to the host side
     set_int(dev, true);
 }
 
@@ -137,11 +131,7 @@ static void pinnacle_work_cb(struct k_work *work) {
 static void pinnacle_gpio_cb(const struct device *port, struct gpio_callback *cb, uint32_t pins) {
     struct pinnacle_data *data = CONTAINER_OF(cb, struct pinnacle_data, gpio_cb);
     const struct device *dev = data->dev;
-    set_int(dev, false); // disable interrupt on mcu side
-
-    pinnacle_write(dev, PINNACLE_STATUS1, 0);   // clear hardware interrupt on trackpad side */
-
-    // dispatch data handling to work thead
+    pinnacle_write(dev, PINNACLE_STATUS1, 0);   // Clear SW_DR
 #if defined(CONFIG_PINNACLE_TRIGGER_OWN_THREAD)
     k_sem_give(&data->gpio_sem);
 #elif defined(CONFIG_PINNACLE_TRIGGER_GLOBAL_THREAD)
@@ -159,23 +149,14 @@ static int pinnacle_init(const struct device *dev) {
     const struct pinnacle_config *config = dev->config;
     data->spi = DEVICE_DT_GET(SPI_BUS);
 
-    // todo: wait for power-on or not
-    pinnacle_write(dev, PINNACLE_STATUS1, 0);   // Clear CC after power-on
-
-    // disable z-idle packets
+    pinnacle_write(dev, PINNACLE_STATUS1, 0);   // Clear CC
     pinnacle_write(dev, PINNACLE_Z_IDLE, 0);    // No Z-Idle packets
-
-    // set sleep-mode
     if (config->sleep_en) {
         pinnacle_write(dev, PINNACLE_SYS_CFG, PINNACLE_SYS_CFG_EN_SLEEP);
     }
-
-    // set tap
     if (config->no_taps) {
         pinnacle_write(dev, PINNACLE_FEED_CFG2, PINNACLE_FEED_CFG2_DIS_TAP);
     }
-
-    // data mode and enable feed
     uint8_t feed_cfg1 = PINNACLE_FEED_CFG1_EN_FEED;
     if (config->invert_x) {
         feed_cfg1 |= PINNACLE_FEED_CFG1_INV_X;
@@ -231,7 +212,7 @@ static const struct pinnacle_config pinnacle_config = {
         .cs = &pinnacle_config.spi_cs,
         .frequency = DT_INST_PROP(0, spi_max_frequency),
         .slave = DT_INST_REG_ADDR(0),
-        .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_LINES_SINGLE | SPI_TRANSFER_MSB), // | SPI_MODE_CPHA),
+        .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_LINES_SINGLE | SPI_TRANSFER_MSB),
     },
     .invert_x = DT_INST_PROP(0, invert_x),
     .invert_y = DT_INST_PROP(0, invert_y),
