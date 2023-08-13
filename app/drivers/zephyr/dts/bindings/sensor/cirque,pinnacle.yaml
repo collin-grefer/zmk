@@ -1,27 +1,27 @@
-description: |
-  Sensor driver for the Cirque Pinnacle trackpad ASICs
+# description: |
+#   Sensor driver for the Cirque Pinnacle trackpad ASICs
 
-compatible: "cirque,pinnacle"
+# compatible: "cirque,pinnacle"
 
-include: spi-device.yaml
+# include: spi-device.yaml
 
-on-bus: spi
+# on-bus: spi
 
-properties:
-  spi-max-frequency:
-    type: int
-    required: true
-    description: |
-      Maximum SPI clock speed supported by the device, in Hz.
-  dr-gpios:
-    type: phandle-array
-    required: true
-    description: Data ready pin for the trackpad
-  invert-x:
-    type: boolean
-  invert-y:
-    type: boolean
-  sleep:
-    type: boolean
-  no-taps:
-    type: boolean
+# properties:
+#   spi-max-frequency:
+#     type: int
+#     required: true
+#     description: |
+#       Maximum SPI clock speed supported by the device, in Hz.
+#   dr-gpios:
+#     type: phandle-array
+#     required: true
+#     description: Data ready pin for the trackpad
+#   invert-x:
+#     type: boolean
+#   invert-y:
+#     type: boolean
+#   sleep:
+#     type: boolean
+#   no-taps:
+#     type: boolean
