@@ -1,0 +1,10 @@
+file_format: "1"
+id: corne_cirque
+name: Corne with Cirque Trackpad Using I2C
+type: shield
+url: https://github.com/jgreel/wearable_cirque_pim447
+requires:
+  - nice_nano_v2
+  - cirque pinnacle trackpad
+features:
+  - mouse
