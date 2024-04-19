@@ -1,0 +1,25 @@
+if SHIELD_TRINIDOX_RIGHT
+
+    config ZMK_KEYBOARD_NAME
+        default "Trinidox"
+
+    config ZMK_SPLIT_BLE_ROLE_CENTRAL
+        default y
+
+endif
+
+if SHIELD_TRINIDOX_LEFT
+
+    config ZMK_KEYBOARD_NAME
+        default "Trinidox_left"
+endif
+
+if SHIELD_TRINIDOX_LEFT || SHIELD_TRINIDOX_RIGHT
+
+    config ZMK_SPLIT
+        default y
+
+    config ZMK_USB
+        default y
+
+endif

@@ -1,0 +1,5 @@
+config SHIELD_TRINIDOX_LEFT
+    def_bool $(shields_list_contains,trinidox_left)
+
+config SHIELD_TRINIDOX_RIGHT
+    def_bool $(shields_list_contains,trinidox_right)
